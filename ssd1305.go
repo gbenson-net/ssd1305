@@ -1,0 +1,183 @@
+// Package ssd1306 controls a 132x64 monochrome OLED display via an
+// SSD1305 controller.
+//
+// Datasheet:
+// https://cdn-shop.adafruit.com/datasheets/SSD1305.pdf
+package ssd1305
+
+import (
+	"fmt"
+	"image"
+	"time"
+
+	"periph.io/x/conn/v3"
+	"periph.io/x/conn/v3/gpio"
+	"periph.io/x/conn/v3/physic"
+	"periph.io/x/conn/v3/spi"
+	"periph.io/x/devices/v3/ssd1306/image1bit"
+)
+
+type SSD1305 struct {
+	// Display size.  Defaults to 132x64 if not specified.
+	Width, Height int
+
+	// SPI port to use.
+	Port spi.Port
+
+	// Data/Command selection pin (high for data, low for command).
+	DC gpio.PinOut
+
+	// Reset pin, low active. May be nil.
+	RST gpio.PinOut
+
+	conn conn.Conn
+	rect image.Rectangle
+}
+
+// Open connects to an SSD1305 display controller.
+func (d *SSD1305) Open() error {
+	if d.conn != nil {
+		panic("already connected")
+	} else if d.Port == nil {
+		panic("nil port")
+	} else if d.DC == nil {
+		panic("nil DC pin")
+	}
+
+	w := d.Width
+	if w == 0 {
+		w = 132
+	} else if w < 8 || w > 132 || w&7 != 0 {
+		return fmt.Errorf("ssd1305: invalid width %d", w)
+	}
+	d.rect.Max.X = w
+
+	h := d.Height
+	if h == 0 {
+		h = 132
+	} else if h < 8 || h > 64 || h&7 != 0 {
+		return fmt.Errorf("ssd1305: invalid height %d", h)
+	}
+	d.rect.Max.Y = h
+
+	// if err := d.DC.Out(gpio.Low); err != nil {
+	// 	return err
+	// }
+
+	if c, err := d.Port.Connect(3300*physic.KiloHertz, spi.Mode0, 8); err != nil {
+		return err
+	} else {
+		d.conn = c
+	}
+
+	return d.Reset()
+}
+
+// Close implements [io.Closer].
+func (d *SSD1305) Close() error {
+	if d.conn == nil {
+		panic("not connected")
+	}
+	defer func() { d.conn = nil }()
+	return d.sendCommand([]byte{
+		0xAE, // Display OFF
+	})
+}
+
+// String implements [io.Stringer].
+func (d *SSD1305) String() string {
+	return fmt.Sprintf("SSD1305{%v, %v, %v, %s}", d.conn, d.DC, d.RST, d.rect.Max)
+}
+
+// Reset resets an SSD1305 display controller.
+func (d *SSD1305) Reset() error {
+	if d.conn == nil {
+		panic("not connected")
+	}
+
+	if rp := d.RST; rp != nil {
+		if err := rp.Out(gpio.Low); err != nil {
+			return err
+		}
+		time.Sleep(10 * time.Millisecond)
+
+		if err := rp.Out(gpio.High); err != nil {
+			return err
+		}
+	}
+
+	if d.Width != 128 || d.Height != 32 {
+		panic("not implemented")
+		// because the below is from
+		// https://www.waveshare.com/wiki/2.23inch_OLED_HAT#Download_demo
+		// (https://files.waveshare.com/upload/c/c5/2.23inch-OLED-HAT-Code.7z)
+		// specifically the Python non-scrolling demo,
+		// and it's commented "128x32 pixel specific initialization."
+	}
+	return d.sendCommand([]byte{
+		0xAE,       // Display OFF
+		0x04,       // Set Lower Column Start Address for Page Addressing Mode
+		0x10,       // Set Higher Column Start Address for Page Addressing Mode
+		0x40,       // Set Display Start Line
+		0x81, 0x80, // Set Contrast Control for BANK0
+		0xA1,       // Set Segment Re-map
+		0xA6,       // Set Normal/Inverse Display
+		0xA8, 0x1F, // Set Multiplex Ratio
+		0xC8,       // Set COM Output Scan Direction
+		0xD3, 0x00, // Set Display Offset
+		0xD5, 0xF0, // Set Display Clock Divide Ratio/ Oscillator Frequency
+		0xD8, 0x05, // Set Area Color Mode ON/OFF & Low Power Display Mode
+		0xD9, 0xC2, // Set pre-charge period
+		0xDA, 0x12, // Set COM Pins Hardware Configuration
+		0xDB, // Set VCOMH Deselect Level
+		0x08, // Set VCOM Deselect Level
+		0xAF, // Normal Brightness Display ON
+	})
+}
+
+// Bounds implements [display.Drawer].
+func (d *SSD1305) Bounds() image.Rectangle {
+	return d.rect
+}
+
+// Draw implements [display.Drawer].
+func (d *SSD1305) Draw(r image.Rectangle, src image.Image, sp image.Point) error {
+	var next []byte
+	if img, ok := src.(*image1bit.VerticalLSB); ok && r == d.rect &&
+		img.Rect == d.rect && sp.X == 0 && sp.Y == 0 {
+		// Exact size, full frame, image1bit encoding: fast path!
+		next = img.Pix
+	} else {
+		panic("not implemented")
+	}
+
+	w := d.rect.Max.X
+	for page := range byte(d.rect.Max.Y / 8) {
+		if err := d.sendCommand([]byte{
+			0xB0 + page, // Set Page Start Address for Page Addressing Mode
+			0x04,        // Set Lower Column Start Address for Page Addressing Mode
+			0x10,        // Set Higher Column Start Address for Page Addressing Mode
+		}); err != nil {
+			return err
+		}
+
+		if err := d.DC.Out(gpio.High); err != nil {
+			return err
+		}
+
+		if err := d.conn.Tx(next[:w], nil); err != nil {
+			return err
+		}
+
+		next = next[w:]
+	}
+
+	return nil
+}
+
+func (d *SSD1305) sendCommand(b []byte) error {
+	if err := d.DC.Out(gpio.Low); err != nil {
+		return err
+	}
+	return d.conn.Tx(b, nil)
+}
