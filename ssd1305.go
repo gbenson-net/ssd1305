@@ -1,4 +1,4 @@
-// Package ssd1306 controls a 132x64 monochrome OLED display via an
+// Package ssd1305 controls a 132x64 monochrome OLED display via an
 // SSD1305 controller.
 //
 // Datasheet:
