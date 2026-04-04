@@ -37,7 +37,7 @@ type SSD1305 struct {
 // Open connects to an SSD1305 display controller.
 func (d *SSD1305) Open() error {
 	if d.conn != nil {
-		panic("already connected")
+		return ErrConnected
 	} else if d.Port == nil {
 		panic("nil port")
 	} else if d.DC == nil {
@@ -76,7 +76,7 @@ func (d *SSD1305) Open() error {
 // Close implements [io.Closer].
 func (d *SSD1305) Close() error {
 	if d.conn == nil {
-		panic("not connected")
+		return ErrNotConnected
 	}
 	defer func() { d.conn = nil }()
 	return d.sendCommand([]byte{
@@ -92,7 +92,7 @@ func (d *SSD1305) String() string {
 // Reset resets an SSD1305 display controller.
 func (d *SSD1305) Reset() error {
 	if d.conn == nil {
-		panic("not connected")
+		return ErrNotConnected
 	}
 
 	if rp := d.RST; rp != nil {
