@@ -80,7 +80,7 @@ func (d *SSD1305) Close() error {
 	}
 	defer func() { d.conn = nil }()
 	return d.sendCommand([]byte{
-		0xAE, // Display OFF
+		0xAE, // Set Display OFF
 	})
 }
 
@@ -115,7 +115,7 @@ func (d *SSD1305) Reset() error {
 		// and it's commented "128x32 pixel specific initialization."
 	}
 	return d.sendCommand([]byte{
-		0xAE,       // Display OFF
+		0xAE,       // Set Display OFF
 		0x04,       // Set Lower Column Start Address for Page Addressing Mode
 		0x10,       // Set Higher Column Start Address for Page Addressing Mode
 		0x40,       // Set Display Start Line
@@ -129,9 +129,8 @@ func (d *SSD1305) Reset() error {
 		0xD8, 0x05, // Set Area Color Mode ON/OFF & Low Power Display Mode
 		0xD9, 0xC2, // Set pre-charge period
 		0xDA, 0x12, // Set COM Pins Hardware Configuration
-		0xDB, // Set VCOMH Deselect Level
-		0x08, // Set VCOM Deselect Level
-		0xAF, // Normal Brightness Display ON
+		0xDB, 0x08, // Set VCOMH Deselect Level
+		0xAF, // Set Display ON (Normal Brightness)
 	})
 }
 
