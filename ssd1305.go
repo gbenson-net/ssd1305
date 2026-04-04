@@ -54,15 +54,11 @@ func (d *SSD1305) Open() error {
 
 	h := d.Height
 	if h == 0 {
-		h = 132
+		h = 64
 	} else if h < 8 || h > 64 || h&7 != 0 {
 		return fmt.Errorf("ssd1305: invalid height %d", h)
 	}
 	d.rect.Max.Y = h
-
-	// if err := d.DC.Out(gpio.Low); err != nil {
-	// 	return err
-	// }
 
 	if c, err := d.Port.Connect(3300*physic.KiloHertz, spi.Mode0, 8); err != nil {
 		return err
