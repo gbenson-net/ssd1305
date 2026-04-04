@@ -47,7 +47,7 @@ func (d *SSD1305) Open() error {
 	w := d.Width
 	if w == 0 {
 		w = 132
-	} else if w < 8 || w > 132 || w&7 != 0 {
+	} else if w < 1 || w > 132 {
 		return fmt.Errorf("ssd1305: invalid width %d", w)
 	}
 	d.rect.Max.X = w
