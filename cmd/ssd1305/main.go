@@ -37,11 +37,12 @@ func run() error {
 	defer port.Close()
 
 	dev := ssd1305.SSD1305{
-		Port:   port,
-		Width:  128,
-		Height: 32,
-		DC:     gpioreg.ByName("GPIO24"),
-		RST:    gpioreg.ByName("GPIO25"),
+		Port:     port,
+		Width:    128,
+		Height:   32,
+		DC:       gpioreg.ByName("GPIO24"),
+		RST:      gpioreg.ByName("GPIO25"),
+		StartCol: 4,
 	}
 	if err = dev.Open(); err != nil {
 		return err

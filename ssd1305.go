@@ -30,6 +30,9 @@ type SSD1305 struct {
 	// Reset pin, low active. May be nil.
 	RST gpio.PinOut
 
+	// Start column.  Defaults to 0.
+	StartCol int
+
 	conn conn.Conn
 	rect image.Rectangle
 }
@@ -59,6 +62,11 @@ func (d *SSD1305) Open() error {
 		return fmt.Errorf("ssd1305: invalid height %d", h)
 	}
 	d.rect.Max.Y = h
+
+	sc := d.StartCol
+	if sc < 0 || sc+w > 132 {
+		return fmt.Errorf("ssd1305: invalid start column %d", sc)
+	}
 
 	if c, err := d.Port.Connect(3300*physic.KiloHertz, spi.Mode0, 8); err != nil {
 		return err
@@ -102,18 +110,8 @@ func (d *SSD1305) Reset() error {
 		}
 	}
 
-	if d.Width != 128 || d.Height != 32 {
-		panic("not implemented")
-		// because the below is from
-		// https://www.waveshare.com/wiki/2.23inch_OLED_HAT#Download_demo
-		// (https://files.waveshare.com/upload/c/c5/2.23inch-OLED-HAT-Code.7z)
-		// specifically the Python non-scrolling demo,
-		// and it's commented "128x32 pixel specific initialization."
-	}
 	return d.sendCommand([]byte{
 		0xAE,       // Set Display OFF
-		0x04,       // Set Lower Column Start Address for Page Addressing Mode
-		0x10,       // Set Higher Column Start Address for Page Addressing Mode
 		0x40,       // Set Display Start Line
 		0x81, 0x80, // Set Contrast Control for BANK0
 		0xA1,       // Set Segment Re-map
@@ -146,12 +144,16 @@ func (d *SSD1305) Draw(r image.Rectangle, src image.Image, sp image.Point) error
 		panic("not implemented")
 	}
 
+	sc := d.StartCol
+	sclo := byte(sc & 15)
+	schi := byte(sc>>4) | 0x10
+
 	w := d.rect.Max.X
 	for page := range byte(d.rect.Max.Y / 8) {
 		if err := d.sendCommand([]byte{
 			0xB0 + page, // Set Page Start Address for Page Addressing Mode
-			0x04,        // Set Lower Column Start Address for Page Addressing Mode
-			0x10,        // Set Higher Column Start Address for Page Addressing Mode
+			sclo,        // Set Lower Column Start Address for Page Addressing Mode
+			schi,        // Set Higher Column Start Address for Page Addressing Mode
 		}); err != nil {
 			return err
 		}
