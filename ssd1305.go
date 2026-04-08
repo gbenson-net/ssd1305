@@ -8,6 +8,7 @@ package ssd1305
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"time"
 
 	"periph.io/x/conn/v3"
@@ -79,10 +80,15 @@ func (d *SSD1305) Open() error {
 
 // Close implements [io.Closer].
 func (d *SSD1305) Close() error {
+	defer func() { d.conn = nil }()
+	return d.Halt()
+}
+
+// Halt implements [conn.Resource].
+func (d *SSD1305) Halt() error {
 	if d.conn == nil {
 		return ErrNotConnected
 	}
-	defer func() { d.conn = nil }()
 	return d.sendCommand([]byte{
 		0xAE, // Set Display OFF
 	})
@@ -126,6 +132,13 @@ func (d *SSD1305) Reset() error {
 		0xDB, 0x08, // Set VCOMH Deselect Level
 		0xAF, // Set Display ON (Normal Brightness)
 	})
+}
+
+// ColorModel implements [display.Drawer].
+//
+// SSD1305 uses a one bit color model, as implemented by [image1bit.Bit].
+func (d *SSD1305) ColorModel() color.Model {
+	return image1bit.BitModel
 }
 
 // Bounds implements [display.Drawer].
