@@ -88,7 +88,7 @@ func (d *SSD1305) Close() error {
 	})
 }
 
-// String implements [io.Stringer].
+// String implements [fmt.Stringer].
 func (d *SSD1305) String() string {
 	return fmt.Sprintf("SSD1305{%v, %v, %v, %s}", d.conn, d.DC, d.RST, d.rect.Max)
 }
