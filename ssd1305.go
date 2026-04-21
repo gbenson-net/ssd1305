@@ -34,8 +34,9 @@ type SSD1305 struct {
 	// Start column.  Defaults to 0.
 	StartCol int
 
-	conn conn.Conn
-	rect image.Rectangle
+	conn   conn.Conn
+	rect   image.Rectangle
+	halted bool
 }
 
 // Open connects to an SSD1305 display controller.
@@ -84,14 +85,23 @@ func (d *SSD1305) Close() error {
 	return d.Halt()
 }
 
-// Halt implements [conn.Resource].
+// Halt turns off the display.
+//
+// Sending any other command afterward reenables the display.
 func (d *SSD1305) Halt() error {
 	if d.conn == nil {
 		return ErrNotConnected
 	}
-	return d.sendCommand([]byte{
+	if d.halted {
+		return nil // already halted
+	}
+	err := d.sendCommand([]byte{
 		0xAE, // Set Display OFF
 	})
+	if err == nil {
+		d.halted = true
+	}
+	return err
 }
 
 // String implements [fmt.Stringer].
@@ -116,6 +126,7 @@ func (d *SSD1305) Reset() error {
 		}
 	}
 
+	d.halted = false
 	return d.sendCommand([]byte{
 		0xAE,       // Set Display OFF
 		0x40,       // Set Display Start Line
@@ -189,5 +200,15 @@ func (d *SSD1305) sendCommand(b []byte) error {
 	if err := d.DC.Out(gpio.Low); err != nil {
 		return err
 	}
-	return d.conn.Tx(b, nil)
+	if d.halted {
+		// Transparently re-enable the display.
+		b = append([]byte{
+			0xAF, // Set Display ON (Normal Brightness)
+		}, b...)
+	}
+	err := d.conn.Tx(b, nil)
+	if err == nil && d.halted {
+		d.halted = false
+	}
+	return err
 }

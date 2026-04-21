@@ -55,13 +55,36 @@ func run() error {
 		Src:  &image.Uniform{C: image1bit.On},
 		Dst:  img,
 		Face: basicfont.Face7x13,
-		Dot:  fixed.P(0, 12),
-	}
-	drawer.DrawString("Hello world!")
-	if err := dev.Draw(dev.Bounds(), img, image.Point{}); err != nil {
-		return err
 	}
 
-	time.Sleep(1 * time.Second)
+	for i := range 4 {
+		drawer.Dot.X = fixed.I((i & 1) * 16)
+		drawer.Dot.Y = fixed.I(i*6 + 12)
+		drawer.DrawString("Hello world!")
+
+		if err := dev.Draw(dev.Bounds(), img, image.Point{}); err != nil {
+			return err
+		}
+
+		time.Sleep(1 * time.Second)
+
+		if err := dev.Halt(); err != nil {
+			return err
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	for i := range 5 {
+		drawer.Dot.X = fixed.I(128 - 35 + i*7)
+		drawer.Dot.Y = fixed.I(i*4 + 12)
+		drawer.DrawString(fmt.Sprintf("%d", 5-i))
+
+		if err := dev.Draw(dev.Bounds(), img, image.Point{}); err != nil {
+			return err
+		}
+
+		time.Sleep(1 * time.Second)
+	}
 	return nil
 }
